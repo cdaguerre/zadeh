@@ -43,6 +43,14 @@ export type StringArrayFilterOptions = IOptions & {
 }
 
 export type ObjectArrayFilterOptions = StringArrayFilterOptions
+export type TreeFilterOptions = StringArrayFilterOptions
+
+/** @deprecated The key to use when candidates is an object
+ * Deprecated option.
+ */
+export type DeprecatedFilterOptions<T extends StringOrObjectArray> = IOptions & {
+  key?: T extends string ? never : keyof T
+}
 
 const defaultPathSeparator = process.platform === "win32" ? "\\" : "/"
 
@@ -57,7 +65,7 @@ function parseOptions(options: IOptions) {
   }
 }
 
-function parseFilterOptions<T extends StringOrObjectArray>(filterOptions: IFilterOptions<T>) {
+function parseFilterOptions(filterOptions: StringArrayFilterOptions | ObjectArrayFilterOptions | TreeFilterOptions) {
   // options.optCharRegEx ? = null
   // options.wrap ? = null
   if (!filterOptions.maxResults) {
@@ -67,10 +75,8 @@ function parseFilterOptions<T extends StringOrObjectArray>(filterOptions: IFilte
   parseOptions(filterOptions)
 }
 
-function getDataKey<T extends StringOrObjectArray>(dataKey: string | IFilterOptions<T>): string | undefined {
-  if (typeof dataKey === "string") {
-    return dataKey
-  } else if (dataKey?.key) {
+function getDataKey<T extends StringOrObjectArray>(dataKey: DeprecatedFilterOptions<T>): string | undefined {
+  if (dataKey?.key) {
     // console.warn(`Zadeh: deprecated option.
     // Pass the key as a string to the second argument of 'ArrayFilterer.setCandidates'
     // or to the third argument of 'filter'`)
@@ -101,9 +107,9 @@ export class StringArrayFilterer {
   // @ts-ignore
   candidates: Array<string>
 
-  constructor(candidates?: Array<string>, dataKey?: string) {
+  constructor(candidates?: Array<string>) {
     if (candidates) {
-      this.setCandidates(candidates, dataKey)
+      this.setCandidates(candidates)
     } else {
       this.candidates = []
     }
@@ -122,24 +128,19 @@ export class StringArrayFilterer {
    *  @param options options
    *  @return returns an array of candidates sorted by best match against the query.
    */
-  filter(query: string, options: IFilterOptions<string> = {}): Array<string> {
+  filter(query: string, options: StringArrayFilterOptions = {}): Array<string> {
     parseFilterOptions(options)
-    this.obj.filter(
+    return this.obj.filter(
       query,
       options.maxResults as number /* numberified by parseFilterOptions */,
       Boolean(options.usePathScoring),
       Boolean(options.useExtensionBonus)
     )
-    return res.map((ind: number) => this.candidates[ind])
   }
 }
 
-/**
- * @deprecated use ArrayFilterer or TreeFilterer classes instead
- */
-export const New = () => new ArrayFilterer()
-
 /** Sort and filter the given candidates by matching them against the given query.
+ * @deprecated
  * @param candidates An array of strings or objects.
  * @param query A string query to match each candidate against.
  * @param options options
@@ -148,7 +149,7 @@ export const New = () => new ArrayFilterer()
 export function filter<T extends StringOrObjectArray>(
   candidates: T[],
   query: string,
-  options: IFilterOptions<T> = {}
+  options: StringArrayFilterOptions | ObjectArrayFilterOptions = {}
 ): T[] {
   if (!candidates || !query) {
     console.warn(`Zadeh: bad input to filter candidates: ${candidates}, query: ${query}`)
@@ -205,7 +206,7 @@ export class TreeFilterer<T extends Tree = Tree> {
    *  @param options options
    *  @return An array of candidate objects in form of `{data, index, level}` sorted by best match against the query. Each objects has the address of the object in the tree using `index` and `level`.
    */
-  filter(query: string, options: IFilterOptions<ObjectElement> = {}): TreeFilterResult[] {
+  filter(query: string, options: TreeFilterOptions = {}): TreeFilterResult[] {
     parseFilterOptions(options)
     return this.obj.filterTree(
       query,
@@ -219,11 +220,11 @@ export class TreeFilterer<T extends Tree = Tree> {
    *  @param query A string query to match each candidate against.
    *  @param options options
    */
-  filterIndices(query: string, options: IFilterOptions<ObjectElement> = {}) {
+  filterIndices(query: string, options: TreeFilterOptions = {}) {
     parseOptions(options)
     return this.obj.filterIndicesTree(
       query,
-      options.maxResults,
+      options.maxResults ?? 0,
       Boolean(options.usePathScoring),
       Boolean(options.useExtensionBonus)
     )
@@ -247,7 +248,7 @@ export function filterTree(
   query: string,
   dataKey: string = "data",
   childrenKey: string = "children",
-  options: IFilterOptions<Tree> = {}
+  options: TreeFilterOptions = {}
 ): TreeFilterResult[] {
   if (!candidatesTrees || !query) {
     console.warn(`Zadeh: bad input to filterTree candidatesTrees: ${candidatesTrees}, query: ${query}`)
@@ -263,7 +264,7 @@ export function filterIndicesTree(
   query: string,
   dataKey: string = "data",
   childrenKey: string = "children",
-  options: IFilterOptions<Tree> = {}
+  options: TreeFilterOptions = {}
 ) {
   if (!candidatesTrees || !query) {
     console.warn(`Zadeh: bad input to filterIndicesTree candidatesTrees: ${candidatesTrees}, query: ${query}`)
