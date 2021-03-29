@@ -34,18 +34,15 @@ export interface IOptions {
   preparedQuery?: {}
 }
 
-export type IFilterOptions<T extends StringOrObjectArray> = IOptions & {
-  /** @deprecated The key to use when candidates is an object
-   * Deprecated option. Pass the key as a string to the second argument of 'ArrayFilterer.setCandidates' or to the third argument of 'filter'
-   */
-  key?: T extends string ? never : keyof T
-
+export type StringArrayFilterOptions = IOptions & {
   /** The maximum numbers of results to return */
   maxResults?: number
 
   // TODO not implemented
   // maxInners?: number
 }
+
+export type ObjectArrayFilterOptions = StringArrayFilterOptions
 
 const defaultPathSeparator = process.platform === "win32" ? "\\" : "/"
 
@@ -96,15 +93,15 @@ function getDataKey<T extends StringOrObjectArray>(dataKey: string | IFilterOpti
 export type ObjectElement = object & Record<string, string>
 export type StringOrObjectArray = string | ObjectElement
 
-/** ArrayFilterer is a class that allows to set the `candidates` only once and perform filtering on them multiple times.
+/** StringArrayFilterer is a class that allows to set the `candidates` only once and perform filtering on them multiple times.
  *  This is much more efficient than calling the `filter` function directly.
  */
-export class ArrayFilterer<T extends StringOrObjectArray> {
+export class StringArrayFilterer {
   obj = new binding.Zadeh()
   // @ts-ignore
-  candidates: Array<T>
+  candidates: Array<string>
 
-  constructor(candidates?: Array<T>, dataKey?: string) {
+  constructor(candidates?: Array<string>, dataKey?: string) {
     if (candidates) {
       this.setCandidates(candidates, dataKey)
     } else {
@@ -113,19 +110,11 @@ export class ArrayFilterer<T extends StringOrObjectArray> {
   }
 
   /** The method to set the candidates that are going to be filtered
-   * @param candidates An array of tree objects.
-   * @param dataKey (optional) if `candidates` is an array of objects, pass the key in the object which holds the data.
+   * @param candidates An array of strings.
    */
-  setCandidates(candidates: Array<T>, dataKey?: string) {
+  setCandidates(candidates: Array<string>) {
     this.candidates = candidates
-    let candidateStrings: string[]
-    if (dataKey) {
-      const validDataKey = getDataKey<T>(dataKey)
-      candidateStrings = (candidates as Array<Record<string, string>>).map((item) => item[validDataKey as string])
-    } else {
-      candidateStrings = candidates as string[]
-    }
-    return this.obj.setArrayFiltererCandidates(candidateStrings)
+    return this.obj.setArrayFiltererCandidates(candidates)
   }
 
   /** The method to perform the filtering on the already set candidates
@@ -133,9 +122,9 @@ export class ArrayFilterer<T extends StringOrObjectArray> {
    *  @param options options
    *  @return returns an array of candidates sorted by best match against the query.
    */
-  filter(query: string, options: IFilterOptions<T> = {}): Array<T> {
+  filter(query: string, options: IFilterOptions<string> = {}): Array<string> {
     parseFilterOptions(options)
-    const res = this.obj.filter(
+    this.obj.filter(
       query,
       options.maxResults as number /* numberified by parseFilterOptions */,
       Boolean(options.usePathScoring),
@@ -225,6 +214,20 @@ export class TreeFilterer<T extends Tree = Tree> {
       Boolean(options.useExtensionBonus)
     )
   }
+
+  /** The method to perform the filtering on the already set candidates
+   *  @param query A string query to match each candidate against.
+   *  @param options options
+   */
+  filterIndices(query: string, options: IFilterOptions<ObjectElement> = {}) {
+    parseOptions(options)
+    return this.obj.filterIndicesTree(
+      query,
+      options.maxResults,
+      Boolean(options.usePathScoring),
+      Boolean(options.useExtensionBonus)
+    )
+  }
 }
 
 // TODO better type
@@ -253,6 +256,22 @@ export function filterTree(
   const treeFilterer = new TreeFilterer()
   treeFilterer.setCandidates(candidatesTrees, dataKey, childrenKey)
   return treeFilterer.filter(query, options)
+}
+
+export function filterIndicesTree(
+  candidatesTrees: Tree[],
+  query: string,
+  dataKey: string = "data",
+  childrenKey: string = "children",
+  options: IFilterOptions<Tree> = {}
+) {
+  if (!candidatesTrees || !query) {
+    console.warn(`Zadeh: bad input to filterIndicesTree candidatesTrees: ${candidatesTrees}, query: ${query}`)
+    return []
+  }
+  const treeFilterer = new TreeFilterer()
+  treeFilterer.setCandidates(candidatesTrees, dataKey, childrenKey)
+  return treeFilterer.filterIndices(query, options)
 }
 
 /*

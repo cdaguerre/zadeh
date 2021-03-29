@@ -2,12 +2,13 @@
 #define Zadeh_TreeFilterer_H
 
 #include "common.h"
+#include "data_interface.h"
 #include "options.h"
 #include "filter.h"
 
 namespace zadeh {
 
-template<typename ArrayType, typename ElementType = CandidateString>
+template<typename ArrayType, typename ElementType = CandidateString, typename AllocatorType = std::allocator<ElementType>>
 class ArrayFilterer {
   private:
     vector<std::vector<CandidateString>> partitioned_candidates{};
@@ -37,7 +38,7 @@ class ArrayFilterer {
             if (iChunk < N % num_chunks) {
                 chunk_size++;
             }
-            for (auto iCandidate = cur_start; iCandidate < cur_start + chunk_size; iCandidate++) {
+            for (size_t iCandidate = cur_start; iCandidate < cur_start + chunk_size; iCandidate++) {
                 partitioned_candidates[iChunk].emplace_back(get_at<ArrayType, ElementType>(candidates, iCandidate));
             }
             cur_start += chunk_size;
@@ -58,17 +59,17 @@ class ArrayFilterer {
         return zadeh::filter(partitioned_candidates, query, options);
     }
 
-    auto filter(const std::string &query, const size_t maxResults = 0, const bool usePathScoring = true, const bool useExtensionBonus = false) {
-        auto res = vector<ArrayType>{};
-
+    auto filter(const std::string &query, const AllocatorType &env, const size_t maxResults = 0, const bool usePathScoring = true, const bool useExtensionBonus = false) {
         if (candidates_view == nullptr) {
-            return res;    // return an empty vector (should we throw?)
+            return init<ArrayType, AllocatorType>(static_cast<size_t>(0), env);    // return an empty vector (should we throw?)
         }
 
-        const auto filter_indices = filter(query, maxResults, usePathScoring, useExtensionBonus);
+        const vector<size_t> filtered_indices = filter_indices(query, maxResults, usePathScoring, useExtensionBonus);
 
-        for (size_t i = 0, len = filter_indices.size(); i < len; i++) {
-            res[i] = candidates_view[filter_indices[i]];
+        const size_t filter_indices_length = filtered_indices.size();
+        auto res = init<ArrayType, AllocatorType>(filter_indices_length, env);
+        for (size_t i = 0; i < filter_indices_length; i++) {
+            set_at(res, get_at<ArrayType, ElementType>(candidates_view, filtered_indices[i]), i);
         }
         return res;
     }

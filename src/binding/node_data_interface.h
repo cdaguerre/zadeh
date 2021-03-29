@@ -9,10 +9,15 @@
 
 namespace zadeh {
 
-
-// Node Array Data Interface
+/** Napi::Array Data Interface */
 template<>
-string get_at(const Napi::Array &candidates, const uint32_t j) {
+Napi::Array init(const size_t len, const Napi::Env &env) {
+    auto out = Napi::Array::New(env, len);
+    return out;
+}
+
+template<>
+string get_at(const Napi::Array &candidates, const size_t j) {
     return candidates.Get(j).ToString().Utf8Value();
 }
 
@@ -26,12 +31,23 @@ size_t get_size(const Napi::Array &candidates) {
     return candidates.Length();
 }
 
-// Node Object Data Interface
+/** Napi::Object Data Interface */
+
+template<>
+Napi::Object init(const size_t len, const Napi::Env &env) {
+    auto out = Napi::Object::New(env);
+    return out;
+}
+
 template<>
 CandidateString get_at(const Napi::Object &candidates, const string j) {
     return candidates.Get(j).ToString().Utf8Value();
 }
 
+template<>
+void set_at(Napi::Array &candidates, const CandidateString &value, const size_t iCandidate) {
+    candidates.Set(iCandidate, value);
+}
 
 /** Get the children of a tree_object (Napi::Object) */
 template<>

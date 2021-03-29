@@ -11,10 +11,27 @@ namespace zadeh {
 
 class ZadehNode : public Napi::ObjectWrap<ZadehNode> {
   public:
-    Napi::Value Filter(const Napi::CallbackInfo &info) {
+    Napi::Value filter(const Napi::CallbackInfo &info) {
+        const auto env = info.Env();
+        if (info.Length() != 4 || !info[0].IsString() || !info[1].IsNumber() || !info[2].IsBoolean() || !info[3].IsBoolean()) {
+            Napi::TypeError::New(env, "Invalid arguments for filter").ThrowAsJavaScriptException();
+            return Napi::Array::New(env);
+        }
+
+        const auto filtered_array = arrayFilterer.filter(
+          info[0].As<Napi::String>(),
+          env,
+          info[1].As<Napi::Number>().Uint32Value(),
+          info[2].As<Napi::Boolean>(),
+          info[3].As<Napi::Boolean>());
+
+        return filtered_array;
+    }
+
+    Napi::Value filterIndices(const Napi::CallbackInfo &info) {
         auto res = Napi::Array::New(info.Env());
         if (info.Length() != 4 || !info[0].IsString() || !info[1].IsNumber() || !info[2].IsBoolean() || !info[3].IsBoolean()) {
-            Napi::TypeError::New(info.Env(), "Invalid arguments for Filter").ThrowAsJavaScriptException();
+            Napi::TypeError::New(info.Env(), "Invalid arguments for filter").ThrowAsJavaScriptException();
             return Napi::Boolean();
         }
 
@@ -29,7 +46,6 @@ class ZadehNode : public Napi::ObjectWrap<ZadehNode> {
         }
         return res;
     }
-
 
     Napi::Value setArrayFiltererCandidates(const Napi::CallbackInfo &info) {
         if (info.Length() != 1 || !info[0].IsArray()) {
@@ -61,12 +77,12 @@ class ZadehNode : public Napi::ObjectWrap<ZadehNode> {
     }
 
     /** (query: string, maxResults: number, usePathScoring: bool, useExtensionBonus: bool) */
-    Napi::Value FilterTree(const Napi::CallbackInfo &info) {
+    Napi::Value filterIndicesTree(const Napi::CallbackInfo &info) {
         // parse arguments
         if (info.Length() != 4
             || !info[0].IsString()
             || !info[1].IsNumber() || !info[2].IsBoolean() || !info[3].IsBoolean()) {
-            Napi::TypeError::New(info.Env(), "Invalid arguments for FilterTree").ThrowAsJavaScriptException();
+            Napi::TypeError::New(info.Env(), "Invalid arguments for filterIndicesTree").ThrowAsJavaScriptException();
             return Napi::Array::New(info.Env());
         }
 
@@ -98,7 +114,7 @@ class ZadehNode : public Napi::ObjectWrap<ZadehNode> {
     explicit ZadehNode(const Napi::CallbackInfo &info) : Napi::ObjectWrap<ZadehNode>(info) {}
 
   private:
-    ArrayFilterer<Napi::Array, CandidateString> arrayFilterer{};
+    ArrayFilterer<Napi::Array, CandidateString, Napi::Env> arrayFilterer{};
     TreeFilterer<Napi::Array, Napi::Object> treeFilterer{};
 };
 
